@@ -150,7 +150,7 @@ func down(url string, fname string) error {
 		return nil
 	}
 
-	response, err := getUrl(url, 10*time.Second, "", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36", url)
+	response, err := getUrl(url, 10*time.Second, "", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36", "")
 
 	if err != nil {
 		log.Printf("%s", err)
@@ -343,6 +343,7 @@ func gifHandler(w http.ResponseWriter, req *http.Request) {
 	_, err = os.Stat(filename + "-0.gif")
 	if err != nil || os.IsExist(err) || refresh == "1" {
 		err = down(gif, filename)
+
 		if refresh != "1" && showCache(filename, w) {
 			return
 		}
