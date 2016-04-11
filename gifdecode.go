@@ -62,6 +62,24 @@ func init() {
 	flag.IntVar(&cacheExpire, "expire", 3, "The days expire of cache files")
 }
 
+func removeOldFile(filename string) {
+
+	filepath.Walk(cacheDir, func(path string, fi os.FileInfo, err error) error {
+		if nil == fi {
+			return err
+		}
+		if fi.IsDir() {
+			return err
+		}
+		name := fi.Name()
+		_, filename = filepath.Split(filename)
+		if matched, _ := filepath.Match(filename+"*-*.gif", name); matched {
+			os.Remove(cacheDir + "/" + name)
+		}
+		return err
+	})
+}
+
 func clearCache() {
 	refreshTicker := time.NewTicker(3600 * time.Second)
 	for {
@@ -185,7 +203,7 @@ func mp4Handler(w http.ResponseWriter, req *http.Request) {
 
 	xzoom, err := strconv.Atoi(req.URL.Query().Get("width"))
 
-	if err != nil || xzoom <= 0 {
+	if err != nil || xzoom <= 1000 {
 		xzoom = 2048
 	}
 
@@ -199,7 +217,8 @@ func mp4Handler(w http.ResponseWriter, req *http.Request) {
 			w.Write([]byte("Down Faild, err:" + err.Error()))
 			return
 		}
-		if showCache(filename, w) {
+
+		if refresh != "1" && showCache(filename, w) {
 			return
 		}
 		processMp4(filename, quality, rate, xzoom)
@@ -211,6 +230,7 @@ func mp4Handler(w http.ResponseWriter, req *http.Request) {
 
 func processMp4(filename string, quality int, rate float64, xzoom int) {
 
+	removeOldFile(filename)
 	cmd := exec.Command(ffmpegbin, "-i", filename, "-r", fmt.Sprintf("%.2f", rate), "-f", "image2pipe", "-codec:v", "png", "-")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -314,7 +334,7 @@ func gifHandler(w http.ResponseWriter, req *http.Request) {
 
 	xzoom, err := strconv.Atoi(req.URL.Query().Get("width"))
 
-	if err != nil || xzoom <= 0 {
+	if err != nil || xzoom <= 1000 {
 		xzoom = 2048
 	}
 
@@ -323,7 +343,7 @@ func gifHandler(w http.ResponseWriter, req *http.Request) {
 	_, err = os.Stat(filename + "-0.gif")
 	if err != nil || os.IsExist(err) || refresh == "1" {
 		err = down(gif, filename)
-		if showCache(filename, w) {
+		if refresh != "1" && showCache(filename, w) {
 			return
 		}
 		splitGif(filename, quality, xzoom)
@@ -355,16 +375,20 @@ func showCache(filename string, w http.ResponseWriter) bool {
 	if len(images) == 0 {
 		return false
 	}
+	w.Write([]byte("<html><body bgcolor='#000'>\n"))
 
 	sort.Sort(images)
 	for _, image := range images {
 		w.Write([]byte("<img src='/imgs/" + image.filename + "' width='100%'>\n"))
 	}
+	w.Write([]byte("</body></html>"))
 	return true
 }
 
 // Decode reads and analyzes the given reader as a GIF image
 func splitGif(filename string, quality int, xzoom int) {
+
+	removeOldFile(filename)
 
 	f, err := os.Open(filename)
 	if err != nil {
