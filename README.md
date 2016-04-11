@@ -14,6 +14,10 @@ Usage of ./gifdecode:
   -cache string
   
     	The cache dir of gif and mp4,make sure the directory can be writed. (default "./cache")
+
+-downTimeout int
+
+		The timeout (seconds) of download resource file (default 60)
     	
   -expire int
   
@@ -47,6 +51,8 @@ quality:图片品质，缺省是80
 
 width: 合并后一行图片里多张图片总和的最大宽度
 
+preheat: 预热，用于后台调用，快速返回结果
+
 ####Mp4示例
 
 http://localhost:9100/mp4?src=http%3a%2f%2fus.sinaimg.cn%2f004nAoHQjx070CWyKRUs050401009Sly0k01.mp4%3fKID%3dunistore%2cvideo%26Expires%3d1460365492%26ssig%3dX6FmeNexYK
@@ -57,4 +63,5 @@ refresh: 1强制刷新，其他值表示走cache模式
 
 width: 合并后一行图片里多张图片总和的最大宽度
 
+preheat: 预热，用于后台调用，快速返回结果
 

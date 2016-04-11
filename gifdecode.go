@@ -37,6 +37,7 @@ var listenPort int
 var ffmpegbin string
 var cacheDir string
 var cacheExpire int
+var downLoadTimeout int
 
 type gifFile struct {
 	filename string
@@ -60,6 +61,7 @@ func init() {
 	flag.StringVar(&ffmpegbin, "ffmpeg", "ffmpeg", "The bin of ffmpeg,make sure it is in the PATH")
 	flag.StringVar(&cacheDir, "cache", "./cache", "The cache dir of gif and mp4,make sure the directory can be writed.")
 	flag.IntVar(&cacheExpire, "expire", 3, "The days expire of cache files")
+	flag.IntVar(&downLoadTimeout, "downTimeout", 60, "The timeout (seconds) of download resource file")
 }
 
 func removeOldFile(filename string) {
@@ -150,7 +152,7 @@ func down(url string, fname string) error {
 		return nil
 	}
 
-	response, err := getUrl(url, 10*time.Second, "", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36", "")
+	response, err := getUrl(url, time.Duration(downLoadTimeout)*time.Second, "", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36", "")
 
 	if err != nil {
 		log.Printf("%s", err)
@@ -188,6 +190,7 @@ func mp4Handler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	refresh := req.URL.Query().Get("refresh")
+	preheat := req.URL.Query().Get("preheat")
 
 	rate, err := strconv.ParseFloat(req.URL.Query().Get("fps"), 10)
 
@@ -209,22 +212,37 @@ func mp4Handler(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 
-	filename := cacheDir + "/" + getFileName(mp4, "mp4")
-
-	_, err = os.Stat(filename + "-0.gif")
-	if err != nil || os.IsExist(err) || refresh == "1" {
-		if err := down(mp4, filename); err != nil {
-			w.Write([]byte("Down Faild, err:" + err.Error()))
-			return
+	if preheat != "1" {
+		filename := cacheDir + "/" + getFileName(mp4, "mp4")
+		_, err = os.Stat(filename + "-0.gif")
+		if err != nil || os.IsExist(err) || refresh == "1" {
+			if err := down(mp4, filename); err != nil {
+				w.Write([]byte("Down Faild, err:" + err.Error()))
+				return
+			}
+			if refresh != "1" && showCache(filename, w) {
+				return
+			}
+			processMp4(filename, quality, rate, xzoom)
 		}
-
-		if refresh != "1" && showCache(filename, w) {
-			return
-		}
-		processMp4(filename, quality, rate, xzoom)
-
+		showCache(filename, w)
+	} else {
+		w.Write([]byte("preheat ok"))
+		go func() {
+			filename := cacheDir + "/" + getFileName(mp4, "mp4")
+			_, err = os.Stat(filename + "-0.gif")
+			if err != nil || os.IsExist(err) || refresh == "1" {
+				if err := down(mp4, filename); err != nil {
+					w.Write([]byte("Down Faild, err:" + err.Error()))
+					return
+				}
+				if refresh != "1" && showCache(filename, w) {
+					return
+				}
+				processMp4(filename, quality, rate, xzoom)
+			}
+		}()
 	}
-	showCache(filename, w)
 
 }
 
@@ -325,6 +343,7 @@ func gifHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	refresh := req.URL.Query().Get("refresh")
+	preheat := req.URL.Query().Get("preheat")
 
 	quality, err := strconv.Atoi(req.URL.Query().Get("quality"))
 
@@ -338,18 +357,34 @@ func gifHandler(w http.ResponseWriter, req *http.Request) {
 		xzoom = 2048
 	}
 
-	filename := cacheDir + "/" + getFileName(gif, "gif")
+	if preheat != "1" {
+		filename := cacheDir + "/" + getFileName(gif, "gif")
 
-	_, err = os.Stat(filename + "-0.gif")
-	if err != nil || os.IsExist(err) || refresh == "1" {
-		err = down(gif, filename)
+		_, err = os.Stat(filename + "-0.gif")
+		if err != nil || os.IsExist(err) || refresh == "1" {
+			err = down(gif, filename)
 
-		if refresh != "1" && showCache(filename, w) {
-			return
+			if refresh != "1" && showCache(filename, w) {
+				return
+			}
+			splitGif(filename, quality, xzoom)
 		}
-		splitGif(filename, quality, xzoom)
+		showCache(filename, w)
+	} else {
+		w.Write([]byte("preheat ok"))
+		go func() {
+			filename := cacheDir + "/" + getFileName(gif, "gif")
+			_, err = os.Stat(filename + "-0.gif")
+			if err != nil || os.IsExist(err) || refresh == "1" {
+				err = down(gif, filename)
+
+				if refresh != "1" && showCache(filename, w) {
+					return
+				}
+				splitGif(filename, quality, xzoom)
+			}
+		}()
 	}
-	showCache(filename, w)
 }
 
 func showCache(filename string, w http.ResponseWriter) bool {
