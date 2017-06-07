@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	ipfile = flag.String("ipfile", "./ip_standard.txt", "Ip file path,default is ./ip_standard.txt ")
+	ipfile = flag.String("ipfile", "./ip_standard.txt", "th ip lib file path")
 )
 
 //IPLib format: 1861807616      1861807871      中国    河北省  邯郸市  永年县  未知    联通
